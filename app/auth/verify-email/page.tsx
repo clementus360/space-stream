@@ -1,11 +1,11 @@
 'use client'
 
 import { useSearchParams } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { authApi } from '@/utils/api/auth'
 import { CheckCircle, XCircle } from 'lucide-react'
 
-export default function VerifyEmailPage() {
+function VerifyEmailContent() {
   const searchParams = useSearchParams()
   const token = searchParams.get('token')
   const [status, setStatus] = useState('Verifying your email...')
@@ -57,5 +57,24 @@ export default function VerifyEmailPage() {
         </div>
       )}
     </div>
+  )
+}
+
+function VerifyEmailFallback() {
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen p-6 bg-background">
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-gray-400 text-lg">Verifying your email...</p>
+      </div>
+    </div>
+  )
+}
+
+export default function VerifyEmailPage() {
+  return (
+    <Suspense fallback={<VerifyEmailFallback />}>
+      <VerifyEmailContent />
+    </Suspense>
   )
 }
