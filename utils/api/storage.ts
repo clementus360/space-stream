@@ -1,13 +1,22 @@
 import { createClient } from '@supabase/supabase-js'
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_KEY!
+let supabaseClient: ReturnType<typeof createClient> | null = null
 
-if (!SUPABASE_URL || !SUPABASE_KEY) {
-  throw new Error('Missing Supabase environment variables')
+function getSupabaseClient() {
+  if (supabaseClient) {
+    return supabaseClient
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_KEY
+
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error('Missing Supabase environment variables')
+  }
+
+  supabaseClient = createClient(supabaseUrl, supabaseKey)
+  return supabaseClient
 }
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
 
 export const storageApi = {
   /**
@@ -17,6 +26,8 @@ export const storageApi = {
    * @returns The public URL of the uploaded image
    */
   async uploadProfilePicture(userId: number, file: File): Promise<string> {
+    const supabase = getSupabaseClient()
+
     if (!file.type.startsWith('image/')) {
       throw new Error('File must be an image')
     }
@@ -58,6 +69,8 @@ export const storageApi = {
    * @param fileName - The file name to delete
    */
   async deleteProfilePicture(userId: number, fileName: string): Promise<void> {
+    const supabase = getSupabaseClient()
+
     try {
       const filePath = `profile-pictures/${userId}/${fileName}`
       
