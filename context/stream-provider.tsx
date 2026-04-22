@@ -73,9 +73,9 @@ export function StreamProvider({ children }: { children: React.ReactNode }) {
         }
     }, [fetchLiveStreams, liveLimit])
 
-    const getStream = (identifier: string) => {
+    const getStream = useCallback((identifier: string) => {
         return streamApi.getStream(identifier)
-    }
+    }, [])
 
     return (
         <StreamContext.Provider

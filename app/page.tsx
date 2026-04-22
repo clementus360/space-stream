@@ -2,7 +2,7 @@
 
 import { useAuth } from "@/context/auth-provider";
 import { useStreams } from "@/context/stream-provider";
-import { Avatar, StreamLoadError } from "@/components";
+import { Avatar, StreamLoadError, StreamThumbnail } from "@/components";
 import { useEffect, useState } from "react";
 
 export default function Home() {
@@ -62,15 +62,22 @@ export default function Home() {
                   className="group rounded-xl border border-black/10 dark:bg-black/80 shadow-sm hover:shadow-md transition-shadow cursor-pointer block"
                 >
                   <article>
-                    <div className="relative h-40 w-full rounded-t-xl overflow-hidden bg-linear-to-br from-black/80 via-black/50 to-primary/60">
-                      <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_top,#ffffff_0,transparent_55%)]" />
-                      <div className="absolute left-3 top-3 rounded-full bg-red-500/90 px-3 py-1 text-xs font-semibold text-white">
+                    <div className="relative w-full rounded-t-xl overflow-hidden">
+                      <StreamThumbnail
+                        streamUrl={streamUrl}
+                        alt={`${stream.username} - ${stream.title}`}
+                        width={320}
+                        height={180}
+                        fallbackGradient="bg-gradient-to-br from-black/80 via-black/50 to-primary/60"
+                        lazy={true}
+                      />
+                      <div className="absolute left-3 top-3 rounded-full bg-red-500/90 px-3 py-1 text-xs font-semibold text-white z-10">
                         Live
                       </div>
-                      <div className="absolute right-3 top-3 rounded-full bg-black/70 px-3 py-1 text-xs font-semibold text-white">
+                      <div className="absolute right-3 top-3 rounded-full bg-black/70 px-3 py-1 text-xs font-semibold text-white z-10">
                         {stream.viewer_count.toLocaleString()} watching
                       </div>
-                      <div className="absolute bottom-3 left-3 text-sm font-semibold text-white">
+                      <div className="absolute bottom-3 left-3 text-sm font-semibold text-white z-10 max-w-[calc(100%-24px)] truncate">
                         {stream.title || "Untitled Stream"}
                       </div>
                     </div>

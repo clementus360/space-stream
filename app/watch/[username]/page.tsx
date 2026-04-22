@@ -7,7 +7,8 @@ import { useEffect, useState } from 'react'
 import { StreamInfo } from '@/utils/api/stream.types'
 import { Avatar } from '@/components'
 import { VideoPlayer } from '@/components/VideoPlayer'
-import { Loader } from 'lucide-react'
+import { Button } from '@/components/ui/Button'
+import { Loader, Home } from 'lucide-react'
 
 export default function StreamPage() {
   const params = useParams()
@@ -16,6 +17,7 @@ export default function StreamPage() {
   const [stream, setStream] = useState<StreamInfo | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [streamEnded, setStreamEnded] = useState(false)
 
   useEffect(() => {
     let isMounted = true
@@ -24,6 +26,7 @@ export default function StreamPage() {
       try {
         setLoading(true)
         setError(null)
+        setStreamEnded(false)
         try {
           const streamData = await getStream(username)
           if (isMounted) {
@@ -34,6 +37,12 @@ export default function StreamPage() {
             const live = await streamApi.getLiveStreams(100)
             const match = live.streams.find((item) => item.username === username)
             if (!match) {
+              // Stream not found in current live streams - it either ended or doesn't exist
+              // We'll mark it as "stream ended" for a better user message
+              if (isMounted) {
+                setStreamEnded(true)
+                setError(null)
+              }
               throw err
             }
             if (isMounted) {
@@ -45,7 +54,11 @@ export default function StreamPage() {
         }
       } catch (err: any) {
         if (isMounted) {
-          setError(err.message || 'Failed to load stream')
+          if (streamEnded) {
+            // Already handled above
+          } else {
+            setError(err.message || 'Failed to load stream')
+          }
         }
       } finally {
         if (isMounted) {
@@ -103,12 +116,37 @@ export default function StreamPage() {
     )
   }
 
+  if (streamEnded) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="flex flex-col items-center justify-center text-center">
+          <p className="text-4xl font-semibold text-foreground mb-2">Stream has ended</p>
+          <p className="text-muted-foreground mb-6">
+            The stream from <span className="font-medium">@{username}</span> is no longer live. Check back later or find another stream!
+          </p>
+          <a href="/">
+            <Button variant="primary" size="md" icon={<Home className="w-4 h-4" />}>
+              Back to Live Channels
+            </Button>
+          </a>
+        </div>
+      </div>
+    )
+  }
+
   if (error || !stream) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center px-4">
         <div className="text-center">
           <p className="text-lg font-semibold text-foreground mb-2">Stream not found</p>
-          <p className="text-muted-foreground">{error || 'The stream you are looking for does not exist.'}</p>
+          <p className="text-muted-foreground mb-6">
+            {error || 'The stream you are looking for does not exist.'}
+          </p>
+          <a href="/">
+            <Button variant="primary" size="md" icon={<Home className="w-4 h-4" />}>
+              Back to Live Channels
+            </Button>
+          </a>
         </div>
       </div>
     )
