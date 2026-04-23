@@ -433,13 +433,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       />
 
       {/* Custom controls */}
-      <div className="absolute bottom-0 left-0 right-0 z-20 bg-linear-to-t from-black to-transparent p-4 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300">
+      <div className="absolute bottom-0 left-0 right-0 z-20 bg-linear-to-t from-black to-transparent p-3 opacity-100 transition-opacity duration-300 md:p-4 md:opacity-0 md:group-hover:opacity-100">
         {/* Progress bar (placeholder) */}
         <div className="w-full h-1 bg-gray-600 rounded-full mb-3 cursor-pointer" />
 
         {/* Control buttons */}
-        <div className="flex items-center justify-between text-white">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-3 text-white sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={togglePlay}
               className="p-2 hover:bg-white/20 rounded transition-colors"
@@ -468,7 +468,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               <select
                 value={selectedQuality}
                 onChange={(e) => handleQualityChange(e.target.value)}
-                className="min-w-22 bg-black/60 border border-white/20 rounded px-2 py-1 pr-7 text-xs text-white outline-none"
+                className="min-w-0 max-w-full bg-black/60 border border-white/20 rounded px-2 py-1 pr-7 text-xs text-white outline-none"
                 title="Playback quality"
                 disabled={qualityOptions.length <= 1}
               >

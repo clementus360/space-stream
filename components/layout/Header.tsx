@@ -42,25 +42,25 @@ export const Header: React.FC = () => {
     return (
         <>
             <header className="fixed top-0 left-0 w-full shadow-md z-50 bg-background">
-                <div className="flex items-center justify-between px-6 py-6 gap-8 mx-auto">
+                <div className="flex items-center justify-between gap-3 px-4 py-3 sm:gap-6 sm:px-6 sm:py-4 mx-auto">
 
                     <div className='flex gap-4 items-center justify-center'>
                         {/* Menu Toggle */}
                         <button
                             onClick={toggleSideMenu}
-                            className="cursor-pointer p-2 rounded hover:bg-gray-800 hover:text-accent-foreground"
+                            className="hidden cursor-pointer rounded p-2 hover:bg-gray-800 hover:text-accent-foreground md:inline-flex"
                         >
                             <MenuIcon className="w-6 h-6" />
                         </button>
 
                         {/* Logo */}
                         <Link href="/">
-                            <Logo className="w-24 md:w-24" />
+                            <Logo className="w-20 sm:w-24" />
                         </Link>
                     </div>
 
                     {/* Search */}
-                    <div className="flex-1 mx-8 max-w-md">
+                    <div className="hidden flex-1 max-w-md mx-4 md:block md:mx-8">
                         <input
                             type="text"
                             placeholder="Search..."
@@ -69,7 +69,7 @@ export const Header: React.FC = () => {
                     </div>
 
                     {/* User Actions */}
-                    <div className="flex items-center gap-4 relative">
+                    <div className="relative flex items-center gap-2 sm:gap-4">
                         {isAuthenticated && user ? (
                             <div className="relative" ref={menuRef}>
                                 {/* Avatar + username */}
@@ -87,7 +87,7 @@ export const Header: React.FC = () => {
 
                                 {/* Dropdown Menu */}
                                 {menuOpen && (
-                                    <div className="absolute right-0 mt-2 w-56 bg-background border border-border border-gray-800 rounded-lg shadow-lg overflow-hidden z-50">
+                                    <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] max-w-56 bg-background border border-border border-gray-800 rounded-lg shadow-lg overflow-hidden z-50 sm:w-56">
                                         {/* Top: Avatar + username */}
                                         <div className="flex items-center gap-2 px-4 py-3 border-b border-border border-gray-800">
                                             <Avatar
@@ -157,6 +157,7 @@ export const Header: React.FC = () => {
                         ) : (
                             <Button
                                 variant="primary"
+                                size="sm"
                                 onClick={() => setModalOpen(true)}
                             >
                                 Sign In

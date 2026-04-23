@@ -175,7 +175,7 @@ export default function StreamPage() {
                 {stream.title || 'Untitled Stream'}
               </h1>
 
-              <div className="flex items-center gap-4 mb-6">
+              <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center mb-6">
                 <Avatar
                   src={stream.profile_image_url}
                   alt={stream.username}

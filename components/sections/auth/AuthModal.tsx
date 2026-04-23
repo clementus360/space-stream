@@ -44,7 +44,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         </div>
 
         {/* Tabs */}
-        <div className="flex justify-center gap-4 border-b border-gray-200">
+        <div className="flex flex-wrap justify-center gap-2 border-b border-gray-200 sm:gap-4">
           <button
             onClick={switchToLogin}
             className={`px-4 py-2 font-medium ${

@@ -298,7 +298,7 @@ export default function DashboardPage() {
               </p>
             </div>
 
-            <div className="flex gap-2 border-b border-gray-800">
+            <div className="flex flex-wrap gap-2 border-b border-gray-800">
               <button
                 onClick={() => setActiveTab('stream-key')}
                 className={`px-4 py-2 text-sm font-medium transition ${
@@ -344,14 +344,14 @@ export default function DashboardPage() {
                     </div>
                   ) : streamKey ? (
                     <div className="space-y-4">
-                      <div className="flex gap-2">
+                      <div className="flex flex-col gap-2 sm:flex-row">
                         <div className="flex-1 bg-foreground/5 border border-gray-800 rounded-lg p-3 font-mono text-sm break-all text-foreground">
                           {showKey ? streamKey : maskKey(streamKey)}
                         </div>
                         <Button
                           variant="outline"
                           onClick={copyToClipboard}
-                          className="whitespace-nowrap"
+                          className="w-full whitespace-nowrap sm:w-auto"
                         >
                           Copy
                         </Button>
@@ -364,11 +364,12 @@ export default function DashboardPage() {
                         </p>
                       </div>
 
-                      <div className="flex gap-3">
+                      <div className="flex flex-col gap-3 sm:flex-row">
                         <Button
                           variant="dark-outline"
                           onClick={handleResetStreamKey}
                           disabled={isResetting}
+                          className="w-full sm:w-auto"
                         >
                           {isResetting ? 'Resetting...' : 'Reset Stream Key'}
                         </Button>

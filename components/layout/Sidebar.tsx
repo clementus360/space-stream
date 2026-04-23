@@ -21,7 +21,7 @@ export function StreamSidebar() {
     if (!isSideMenuOpen) return null
 
     return (
-        <aside className={`fixed left-0 top-0 z-40 h-screen w-64 border-r border-black/10 bg-background pt-32 transition duration-300`}>
+        <aside className="fixed left-0 top-0 z-40 hidden h-screen w-64 border-r border-black/10 bg-background pt-32 transition duration-300 md:block">
 
             {isSideMenuOpen &&
                 <div className="px-4 pb-2 text-sm font-semibold text-muted-foreground">

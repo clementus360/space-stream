@@ -21,10 +21,29 @@
 }
 
 /* ---------- Base styles ---------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  overflow-x: hidden;
+}
+
 body {
   background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-gilroy), sans-serif;
+}
+
+img,
+video,
+canvas,
+svg {
+  max-width: 100%;
 }
 
 /* ---------- Dark mode (manual toggle only) ---------- */

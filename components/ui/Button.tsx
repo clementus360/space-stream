@@ -16,7 +16,7 @@ export const Button: React.FC<ButtonProps> = ({ type, variant, size, icon, iconP
             type={type || "button"}
             className={
                 cn(
-                    "flex w-max gap-2 justify-center items-center px-12 py-2 rounded-full cursor-pointer font-semibold",
+                    "inline-flex w-auto max-w-full gap-2 justify-center items-center px-4 py-2 rounded-full cursor-pointer font-semibold sm:px-8 lg:px-12",
                     variant === "primary" && "bg-primary dark:bg-accent text-white hover:bg-primary/80 dark:hover:bg-accent/80 transition-all",
                     variant === "secondary" && "bg-accent dark:bg-primary text-white hover:bg-accent/80 transition-all",
                     variant === "tertiary" && "bg-white text-primary hover:text-white hover:bg-accent/80 transition-all",

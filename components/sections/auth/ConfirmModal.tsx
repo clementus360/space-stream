@@ -37,7 +37,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
           )}
         </div>
 
-        <div className="flex justify-end gap-3">
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <Button variant="outline" onClick={onCancel}>
             {cancelLabel}
           </Button>

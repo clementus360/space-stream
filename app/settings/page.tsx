@@ -76,7 +76,7 @@ export default function SettingsPage() {
             <p className="text-foreground/60 mt-1">Manage your profile picture and account details</p>
           </div>
 
-          <div className="flex flex-col md:flex-row gap-8">
+            <div className="flex flex-col md:flex-row gap-8">
             {/* Profile Picture Section */}
             <div className="flex flex-col items-center gap-4">
               <Avatar
@@ -99,6 +99,7 @@ export default function SettingsPage() {
                   size="sm"
                   disabled={isUploadingProfile}
                   onClick={() => document.getElementById('profile-picture-input')?.click()}
+                  className="w-full sm:w-auto"
                 >
                   {isUploadingProfile ? 'Uploading...' : 'Change Picture'}
                 </Button>
