@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import { authApi } from '@/utils/api/auth'
 import { AuthState, AuthActions } from '@/types/auth-state'
 import { TokenResponse, User, UserStatus } from '@/types/auth'
@@ -36,6 +36,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   })
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [showRefreshModal, setShowRefreshModal] = useState(false)
+  const stateRef = useRef(state)
+  const refreshPromiseRef = useRef<Promise<TokenResponse | null> | null>(null)
+
+  useEffect(() => {
+    stateRef.current = state
+  }, [state])
 
   // ---- Load persisted state ----
   useEffect(() => {
@@ -75,10 +81,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   // ---- Logout ----
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
-      if (state.tokens?.access_token) {
-        await authApi.logout(state.tokens.access_token)
+      const accessToken = stateRef.current.tokens?.access_token
+      if (accessToken) {
+        await authApi.logout(accessToken)
       }
     } finally {
       setState({
@@ -88,7 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading: false,
       })
     }
-  }
+  }, [])
 
   // ---- Register ----
   const register = async (
@@ -105,64 +112,77 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   // ---- Refresh token ----
-  const refresh = useCallback(async (showModal: boolean = false) => {
-    if (isRefreshing) return // Prevent multiple simultaneous refresh attempts
-    
-    if (!state.tokens?.refresh_token) {
-      await logout()
-      return
+  const refreshTokens = useCallback(async (showModal: boolean = false): Promise<TokenResponse | null> => {
+    if (refreshPromiseRef.current) {
+      return refreshPromiseRef.current
     }
 
-    // Show modal if requested
+    const refreshToken = stateRef.current.tokens?.refresh_token
+    if (!refreshToken) {
+      await logout()
+      return null
+    }
+
     if (showModal) {
       setShowRefreshModal(true)
     }
 
-    setIsRefreshing(true)
-    
-    try {
-      const refreshed = await authApi.refresh({
-        refresh_token: state.tokens.refresh_token,
-      })
+    const refreshPromise = (async () => {
+      setIsRefreshing(true)
 
-      // Add issued_at timestamp to new tokens
-      refreshed.issued_at = Date.now()
+      try {
+        const refreshed = await authApi.refresh({
+          refresh_token: refreshToken,
+        })
 
-      const user = await authApi.getCurrentUser(refreshed.access_token)
+        refreshed.issued_at = Date.now()
+        const user = await authApi.getCurrentUser(refreshed.access_token)
 
-      setState({
-        tokens: refreshed,
-        user,
-        isAuthenticated: true,
-        isLoading: false,
-      })
-      
-      if (showModal) {
-        setShowRefreshModal(false)
+        setState({
+          tokens: refreshed,
+          user,
+          isAuthenticated: true,
+          isLoading: false,
+        })
+
+        if (showModal) {
+          setShowRefreshModal(false)
+        }
+
+        return refreshed
+      } catch (err) {
+        console.error('Token refresh failed:', err)
+        if (showModal) {
+          setShowRefreshModal(false)
+        }
+        await logout()
+        return null
+      } finally {
+        setIsRefreshing(false)
+        refreshPromiseRef.current = null
       }
-    } catch (err) {
-      console.error('Token refresh failed:', err)
-      if (showModal) {
-        setShowRefreshModal(false)
-      }
-      await logout()
-    } finally {
-      setIsRefreshing(false)
-    }
-  }, [state.tokens?.refresh_token])
+    })()
+
+    refreshPromiseRef.current = refreshPromise
+    return refreshPromise
+  }, [logout])
+
+  const refresh = useCallback(async () => {
+    await refreshTokens(false)
+  }, [refreshTokens])
 
   // ---- Check and proactively refresh token before API calls ----
   const ensureValidToken = useCallback(async () => {
-    if (isTokenExpiringSoon(state.tokens)) {
+    const tokens = stateRef.current.tokens
+    if (isTokenExpiringSoon(tokens)) {
       console.log('Token expiring soon, refreshing proactively...')
-      // Show modal and refresh
-      await refresh(true)
+      await refreshTokens(false)
     }
-  }, [state.tokens, refresh])
+  }, [refreshTokens])
 
   // ---- Auto-refresh on mount if we have tokens ----
   useEffect(() => {
-    if (state.isAuthenticated && state.tokens && !isRefreshing) {
+    if (!state.isLoading && state.isAuthenticated && state.tokens && !isRefreshing) {
       // Validate token on mount/reload
       authApi.validate(state.tokens.access_token)
         .then((res) => {
@@ -174,35 +194,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           refresh()
         })
     }
-  }, []) // Only run once on mount
+  }, [state.isLoading, state.isAuthenticated, state.tokens?.access_token, isRefreshing, refresh])
 
   // ---- API call wrapper with automatic proactive token refresh ----
   const apiCallWithRefresh = useCallback(async <T,>(
     apiCall: (accessToken: string) => Promise<T>
   ): Promise<T> => {
-    if (!state.tokens?.access_token) {
+    if (!stateRef.current.tokens?.access_token) {
       throw new Error('Not authenticated')
     }
 
     // Check and refresh token before making the request
     await ensureValidToken()
 
+    const currentAccessToken = stateRef.current.tokens?.access_token
+    if (!currentAccessToken) {
+      throw new Error('Not authenticated')
+    }
+
     try {
-      return await apiCall(state.tokens.access_token)
+      return await apiCall(currentAccessToken)
     } catch (err: any) {
       // If we get a 401, try refreshing the token and retry once
       if (err.message?.includes('401') || err.message?.includes('unauthorized')) {
         console.log('Got 401, attempting token refresh...')
-        await refresh()
-        
-        // Retry with the new token
-        if (state.tokens?.access_token) {
-          return await apiCall(state.tokens.access_token)
+        const refreshed = await refreshTokens(false)
+
+        // Retry with the latest token after refresh
+        const nextAccessToken = refreshed?.access_token || stateRef.current.tokens?.access_token
+        if (nextAccessToken) {
+          return await apiCall(nextAccessToken)
         }
       }
       throw err
     }
-  }, [state.tokens?.access_token, ensureValidToken, refresh])
+  }, [ensureValidToken, refreshTokens])
 
   return (
     <>
