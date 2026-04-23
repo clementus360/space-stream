@@ -8,6 +8,7 @@ interface VideoPlayerProps {
   streamUrl: string
   title: string
   username: string
+  onStreamEnded?: () => void
 }
 
 type QualityOption = {
@@ -114,6 +115,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   streamUrl,
   title,
   username,
+  onStreamEnded,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -121,6 +123,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const bufferingTimeoutRef = useRef<number | null>(null)
   const stallRecoveryTimeoutRef = useRef<number | null>(null)
   const hardReconnectCountRef = useRef(0)
+  const hasEmittedStreamEndedRef = useRef(false)
   const [reconnectSeed, setReconnectSeed] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
@@ -163,6 +166,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   }
 
   const scheduleHardReconnect = (reason: string) => {
+    if (hasEmittedStreamEndedRef.current) return
     if (stallRecoveryTimeoutRef.current !== null) return
 
     stallRecoveryTimeoutRef.current = window.setTimeout(() => {
@@ -182,6 +186,17 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const video = videoRef.current
     if (!video) return
     let isActive = true
+    hasEmittedStreamEndedRef.current = false
+
+    const markStreamEnded = (message = 'This stream has ended.') => {
+      if (hasEmittedStreamEndedRef.current) return
+      hasEmittedStreamEndedRef.current = true
+      clearBufferingTimer()
+      clearStallRecoveryTimer()
+      setIsBuffering(false)
+      setError(message)
+      onStreamEnded?.()
+    }
 
     const hideBuffering = () => {
       clearBufferingTimer()
@@ -255,6 +270,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       video.src = playbackUrl
       fetch(playbackUrl, { cache: 'no-store' })
         .then((res) => {
+          if (res.status === 404 || res.status === 410) {
+            markStreamEnded('This stream is no longer live.')
+            throw new Error('Stream ended')
+          }
+
           if (!res.ok) {
             throw new Error(`Failed to fetch master playlist: ${res.status}`)
           }
@@ -321,6 +341,18 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         hideBuffering()
       })
       hls.on(Hls.Events.ERROR, (_event, data) => {
+        const responseStatus = data?.response?.code
+        const likelyEndedStatus = responseStatus === 404 || responseStatus === 410
+        const likelyEndedDetails =
+          data?.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR ||
+          data?.details === Hls.ErrorDetails.LEVEL_LOAD_ERROR ||
+          data?.details === Hls.ErrorDetails.FRAG_LOAD_ERROR
+
+        if (likelyEndedStatus && likelyEndedDetails) {
+          markStreamEnded('This stream is no longer live.')
+          return
+        }
+
         if (data?.fatal) {
           if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
             hls.recoverMediaError()

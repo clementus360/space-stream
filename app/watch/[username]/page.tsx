@@ -21,6 +21,11 @@ export default function StreamPage() {
   const [error, setError] = useState<string | null>(null)
   const [streamEnded, setStreamEnded] = useState(false)
 
+  const handleStreamEnded = () => {
+    setStreamEnded(true)
+    setError(null)
+  }
+
   useEffect(() => {
     let isMounted = true
 
@@ -104,6 +109,27 @@ export default function StreamPage() {
     })
   }, [liveStreams, stream?.username])
 
+  useEffect(() => {
+    if (!stream || streamEnded) return
+
+    let cancelled = false
+    const interval = window.setInterval(async () => {
+      try {
+        await streamApi.getStream(username)
+      } catch (err: any) {
+        if (cancelled) return
+        if (err?.message?.includes('404') || err?.message?.includes('410')) {
+          handleStreamEnded()
+        }
+      }
+    }, 20000)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(interval)
+    }
+  }, [stream, streamEnded, username])
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -162,6 +188,7 @@ export default function StreamPage() {
             streamUrl={streamUrl}
             title={stream.title}
             username={stream.username}
+            onStreamEnded={handleStreamEnded}
           />
         </div>
 
