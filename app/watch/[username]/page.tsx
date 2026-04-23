@@ -9,6 +9,8 @@ import { Avatar } from '@/components'
 import { VideoPlayer } from '@/components/VideoPlayer'
 import { Button } from '@/components/ui/Button'
 import { Loader, Home } from 'lucide-react'
+import { formatViewerCount } from '@/utils/viewers'
+import { buildDistributionWatchUrl } from '@/utils/distribution'
 
 export default function StreamPage() {
   const params = useParams()
@@ -85,11 +87,8 @@ export default function StreamPage() {
       const nextResolution = live.resolution ?? prev.resolution
       const nextProfileImage = live.profile_image_url ?? prev.profile_image_url
 
-      const shouldUpdateViewerCount =
-        nextViewerCount > 0 || prev.viewer_count === 0
-
       if (
-        (!shouldUpdateViewerCount || prev.viewer_count === nextViewerCount) &&
+        prev.viewer_count === nextViewerCount &&
         prev.resolution === nextResolution &&
         prev.profile_image_url === nextProfileImage
       ) {
@@ -98,7 +97,7 @@ export default function StreamPage() {
 
       return {
         ...prev,
-        viewer_count: shouldUpdateViewerCount ? nextViewerCount : prev.viewer_count,
+        viewer_count: nextViewerCount,
         resolution: nextResolution,
         profile_image_url: nextProfileImage,
       }
@@ -152,7 +151,7 @@ export default function StreamPage() {
     )
   }
 
-  const streamUrl = `${process.env.NEXT_PUBLIC_DISTRIBUTION_API_URL}/watch/${stream.session_id}/master.m3u8`
+  const streamUrl = buildDistributionWatchUrl(stream.session_id)
 
   return (
     <div className="min-h-screen pb-16">
@@ -187,7 +186,7 @@ export default function StreamPage() {
                     {stream.username}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {stream.viewer_count.toLocaleString()} viewers
+                    {formatViewerCount(stream.viewer_count)} viewers
                   </p>
                 </div>
               </div>
@@ -219,7 +218,7 @@ export default function StreamPage() {
                     Viewers
                   </p>
                   <p className="text-sm text-foreground mt-1">
-                    {stream.viewer_count.toLocaleString()}
+                    {formatViewerCount(stream.viewer_count)}
                   </p>
                 </div>
               </div>

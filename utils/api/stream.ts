@@ -4,6 +4,7 @@ import {
     UpdateStreamMetadataRequest,
     UpdateStreamMetadataResponse,
 } from './stream.types'
+import { normalizeViewerCount } from '@/utils/viewers'
 
 const STREAM_API_URL = process.env.NEXT_PUBLIC_STREAM_API_URL!
 
@@ -21,13 +22,14 @@ const normalizeStreamInfo = (stream: any): StreamInfo => {
         username: stream.username,
         title: stream.title,
         description: stream.description,
-        viewer_count:
+        viewer_count: normalizeViewerCount(
             stream.viewer_count ??
-            stream.viewerCount ??
-            stream.viewers ??
-            stream.viewers_count ??
-            stream.viewersCount ??
-            0,
+                stream.viewerCount ??
+                stream.viewers ??
+                stream.viewers_count ??
+                stream.viewersCount ??
+                0
+        ),
         resolution: stream.resolution,
         profile_image_url: stream.profile_image_url ?? stream.profileImageUrl ?? null,
     }

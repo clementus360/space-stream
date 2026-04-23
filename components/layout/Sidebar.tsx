@@ -6,6 +6,7 @@ import { Avatar } from '../ui/Avatar'
 import { useUI } from '@/context/ui-provider'
 import { useStreams } from '@/context/stream-provider'
 import { useEffect } from 'react'
+import { formatViewerCount } from '@/utils/viewers'
 
 export function StreamSidebar() {
     const { isSideMenuOpen } = useUI()
@@ -64,7 +65,7 @@ export function StreamSidebar() {
                                 </p>
                                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                     <Users className="h-3 w-3" />
-                                    {stream.viewer_count?.toLocaleString()}
+                                    {formatViewerCount(stream.viewer_count)}
                                 </div>
                             </div>
                         }

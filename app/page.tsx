@@ -4,6 +4,8 @@ import { useAuth } from "@/context/auth-provider";
 import { useStreams } from "@/context/stream-provider";
 import { Avatar, StreamLoadError, StreamThumbnail } from "@/components";
 import { useEffect, useState } from "react";
+import { formatViewerCount } from "@/utils/viewers";
+import { buildDistributionWatchUrl } from "@/utils/distribution";
 
 export default function Home() {
   const { user } = useAuth();
@@ -54,7 +56,7 @@ export default function Home() {
         ) : (
           <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {liveStreams.map((stream) => {
-              const streamUrl = `${process.env.NEXT_PUBLIC_DISTRIBUTION_API_URL}/watch/${stream.session_id}/master.m3u8`
+              const streamUrl = buildDistributionWatchUrl(stream.session_id)
               return (
                 <a
                   key={`${stream.channel_id}-${stream.session_id}`}
@@ -75,7 +77,7 @@ export default function Home() {
                         Live
                       </div>
                       <div className="absolute right-3 top-3 rounded-full bg-black/70 px-3 py-1 text-xs font-semibold text-white z-10">
-                        {stream.viewer_count.toLocaleString()} watching
+                        {formatViewerCount(stream.viewer_count)} watching
                       </div>
                       <div className="absolute bottom-3 left-3 text-sm font-semibold text-white z-10 max-w-[calc(100%-24px)] truncate">
                         {stream.title || "Untitled Stream"}
