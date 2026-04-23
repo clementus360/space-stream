@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect, useMemo, useState } from 'react'
 import { Play, Pause, Volume2, VolumeX, Maximize2, LoaderCircle } from 'lucide-react'
 import Hls from 'hls.js'
 
@@ -16,6 +16,16 @@ type QualityOption = {
   levelIndex?: number
   variantUrl?: string
   height?: number
+}
+
+const withCacheBuster = (url: string, seed: number): string => {
+  try {
+    const nextUrl = new URL(url)
+    nextUrl.searchParams.set('cb', `${Date.now()}-${seed}`)
+    return nextUrl.toString()
+  } catch {
+    return url
+  }
 }
 
 const getHeightFromPath = (variantPath: string): number | null => {
@@ -109,6 +119,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const containerRef = useRef<HTMLDivElement>(null)
   const hlsRef = useRef<Hls | null>(null)
   const bufferingTimeoutRef = useRef<number | null>(null)
+  const stallRecoveryTimeoutRef = useRef<number | null>(null)
+  const hardReconnectCountRef = useRef(0)
+  const [reconnectSeed, setReconnectSeed] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -119,11 +132,19 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     { label: 'Auto', value: 'auto', levelIndex: -1 },
   ])
   const [selectedQuality, setSelectedQuality] = useState('auto')
+  const playbackUrl = useMemo(() => withCacheBuster(streamUrl, reconnectSeed), [streamUrl, reconnectSeed])
 
   const clearBufferingTimer = () => {
     if (bufferingTimeoutRef.current !== null) {
       window.clearTimeout(bufferingTimeoutRef.current)
       bufferingTimeoutRef.current = null
+    }
+  }
+
+  const clearStallRecoveryTimer = () => {
+    if (stallRecoveryTimeoutRef.current !== null) {
+      window.clearTimeout(stallRecoveryTimeoutRef.current)
+      stallRecoveryTimeoutRef.current = null
     }
   }
 
@@ -141,6 +162,22 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     }, 350)
   }
 
+  const scheduleHardReconnect = (reason: string) => {
+    if (stallRecoveryTimeoutRef.current !== null) return
+
+    stallRecoveryTimeoutRef.current = window.setTimeout(() => {
+      hardReconnectCountRef.current += 1
+      if (hardReconnectCountRef.current > 3) {
+        setError('Playback stalled repeatedly. Please refresh the page or try again shortly.')
+        return
+      }
+
+      setError(null)
+      showImmediateBuffering(`Reconnecting stream (${reason})...`)
+      setReconnectSeed((seed) => seed + 1)
+    }, 8000)
+  }
+
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
@@ -148,6 +185,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     const hideBuffering = () => {
       clearBufferingTimer()
+      clearStallRecoveryTimer()
       setIsBuffering(false)
     }
 
@@ -169,11 +207,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const handleWaiting = () => {
       if (video.readyState < 3) {
         scheduleBufferingOverlay('Buffering, waiting for stream chunks...')
+        scheduleHardReconnect('buffering timeout')
       }
     }
     const handleStalled = () => {
       if (video.readyState < 3) {
         scheduleBufferingOverlay('Playback stalled, retrying...')
+        scheduleHardReconnect('stalled playback')
       }
     }
     const handlePlaying = () => {
@@ -212,8 +252,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     // Setup HLS playback
     if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = streamUrl
-      fetch(streamUrl)
+      video.src = playbackUrl
+      fetch(playbackUrl, { cache: 'no-store' })
         .then((res) => {
           if (!res.ok) {
             throw new Error(`Failed to fetch master playlist: ${res.status}`)
@@ -222,7 +262,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         })
         .then((playlistText) => {
           if (!isActive) return
-          const variantOptions = parseMasterPlaylistVariants(playlistText, streamUrl)
+          const variantOptions = parseMasterPlaylistVariants(playlistText, playbackUrl)
           setQualityOptions([
             { label: 'Auto', value: 'auto' },
             ...variantOptions,
@@ -237,10 +277,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       showImmediateBuffering('Connecting to stream...')
       const hls = new Hls({
         enableWorker: true,
-        lowLatencyMode: true,
+        lowLatencyMode: false,
+        maxBufferHole: 1,
+        liveSyncDurationCount: 3,
       })
       hlsRef.current = hls
-      hls.loadSource(streamUrl)
+      hls.loadSource(playbackUrl)
       hls.attachMedia(video)
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         const options: QualityOption[] = [
@@ -280,6 +322,20 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       })
       hls.on(Hls.Events.ERROR, (_event, data) => {
         if (data?.fatal) {
+          if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+            hls.recoverMediaError()
+            scheduleBufferingOverlay('Recovering media playback...')
+            scheduleHardReconnect('media recovery')
+            return
+          }
+
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+            hls.startLoad()
+            scheduleBufferingOverlay('Reconnecting stream network...')
+            scheduleHardReconnect('network recovery')
+            return
+          }
+
           hideBuffering()
           setError(`Playback error: ${data?.type || 'Unknown error'}`)
           return
@@ -290,7 +346,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           data?.details === Hls.ErrorDetails.FRAG_LOAD_ERROR ||
           data?.details === Hls.ErrorDetails.BUFFER_STALLED_ERROR
         ) {
+          hls.startLoad()
           scheduleBufferingOverlay('Reconnecting to stream chunks...')
+          scheduleHardReconnect('fragment retry')
         }
       })
     } else {
@@ -301,6 +359,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     return () => {
       isActive = false
       clearBufferingTimer()
+      clearStallRecoveryTimer()
       if (hlsRef.current) {
         hlsRef.current.destroy()
         hlsRef.current = null
@@ -318,7 +377,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
       video.removeEventListener('error', handleError)
       video.removeEventListener('loadedmetadata', handleLoadedMetadata)
     }
-  }, [streamUrl])
+  }, [playbackUrl])
 
   const togglePlay = () => {
     if (videoRef.current) {
@@ -364,7 +423,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     if (!hls && videoRef.current) {
       if (qualityValue === 'auto') {
         showImmediateBuffering('Switching quality...')
-        videoRef.current.src = streamUrl
+        videoRef.current.src = playbackUrl
         videoRef.current.load()
         videoRef.current.play().catch(() => {
           // Ignore autoplay restrictions.
