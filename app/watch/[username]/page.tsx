@@ -3,7 +3,7 @@
 import { useParams } from 'next/navigation'
 import { useStreams } from '@/context/stream-provider'
 import { streamApi } from '@/utils/api/stream'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { StreamInfo } from '@/utils/api/stream.types'
 import { Avatar } from '@/components'
 import { VideoPlayer } from '@/components/VideoPlayer'
