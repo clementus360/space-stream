@@ -17,6 +17,7 @@ type QualityOption = {
   levelIndex?: number
   variantUrl?: string
   height?: number
+  bandwidth?: number
 }
 
 const withCacheBuster = (url: string, seed: number): string => {
@@ -55,6 +56,36 @@ const getHeightFromHlsLevel = (level: { height?: number; name?: string; url?: st
   return null
 }
 
+const resolveVariantUrl = (variantPath: string, masterUrl: string): string => {
+  const resolved = new URL(variantPath, masterUrl)
+  const master = new URL(masterUrl)
+
+  // Keep playback/session query params from the master URL for relative variants.
+  master.searchParams.forEach((value, key) => {
+    if (!resolved.searchParams.has(key)) {
+      resolved.searchParams.set(key, value)
+    }
+  })
+
+  return resolved.toString()
+}
+
+const formatQualityLabel = (height?: number, bandwidth?: number, fallbackIndex = 1): string => {
+  if (height && bandwidth) {
+    return `${height}p (${Math.round(bandwidth / 1000)}kbps)`
+  }
+
+  if (height) {
+    return `${height}p`
+  }
+
+  if (bandwidth) {
+    return `${Math.round(bandwidth / 1000)}kbps`
+  }
+
+  return `Quality ${fallbackIndex}`
+}
+
 const parseMasterPlaylistVariants = (playlistText: string, masterUrl: string): QualityOption[] => {
   const lines = playlistText.split('\n').map((line) => line.trim())
   const options: QualityOption[] = []
@@ -78,27 +109,30 @@ const parseMasterPlaylistVariants = (playlistText: string, masterUrl: string): Q
     const bandwidthMatch = line.match(/BANDWIDTH=(\d+)/i)
 
     const resolutionHeight = resolutionMatch ? Number(resolutionMatch[1]) : null
+    const bandwidth = bandwidthMatch ? Number(bandwidthMatch[1]) : undefined
     const pathHeight = getHeightFromPath(uriLine)
     const resolvedHeight = resolutionHeight || pathHeight
-    const label = resolvedHeight
-      ? `${resolvedHeight}p`
-      : bandwidthMatch
-        ? `${Math.round(Number(bandwidthMatch[1]) / 1000)}kbps`
-        : `Quality ${options.length + 1}`
+    const label = formatQualityLabel(resolvedHeight ?? undefined, bandwidth, options.length + 1)
 
-    const variantUrl = new URL(uriLine, masterUrl).toString()
+    const variantUrl = resolveVariantUrl(uriLine, masterUrl)
 
     options.push({
       label,
       value: `native-${options.length}`,
       variantUrl,
       height: resolvedHeight ?? undefined,
+      bandwidth,
     })
   }
 
   const unique = new Map<string, QualityOption>()
   options.forEach((option) => {
-    const key = option.height ? `h-${option.height}` : `u-${option.label}-${option.variantUrl}`
+    const key = [
+      option.height ?? 'na',
+      option.bandwidth ?? 'na',
+      option.variantUrl ?? 'na',
+    ].join('|')
+
     if (!unique.has(key)) {
       unique.set(key, option)
     }
@@ -107,7 +141,11 @@ const parseMasterPlaylistVariants = (playlistText: string, masterUrl: string): Q
   return Array.from(unique.values()).sort((a, b) => {
     const aHeight = a.height ?? 0
     const bHeight = b.height ?? 0
-    return aHeight - bHeight
+    if (aHeight !== bHeight) return aHeight - bHeight
+
+    const aBandwidth = a.bandwidth ?? 0
+    const bBandwidth = b.bandwidth ?? 0
+    return aBandwidth - bBandwidth
   })
 }
 
@@ -308,25 +346,34 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         ]
 
         const levels = hls.levels
-          .map((level, index) => ({ level, index }))
-          .map(({ level, index }) => ({
+          .map((level, index) => ({
             index,
-            detectedHeight: getHeightFromHlsLevel(level),
+            height: getHeightFromHlsLevel(level) ?? undefined,
+            bandwidth: typeof level.bitrate === 'number' && level.bitrate > 0 ? level.bitrate : undefined,
           }))
-          .filter((item) => item.detectedHeight !== null)
-          .sort((a, b) => (a.detectedHeight as number) - (b.detectedHeight as number))
+          .sort((a, b) => {
+            const aHeight = a.height ?? 0
+            const bHeight = b.height ?? 0
+            if (aHeight !== bHeight) return aHeight - bHeight
 
-        const seenHeights = new Set<number>()
+            const aBandwidth = a.bandwidth ?? 0
+            const bBandwidth = b.bandwidth ?? 0
+            return aBandwidth - bBandwidth
+          })
 
-        levels.forEach(({ detectedHeight, index }) => {
-          const height = detectedHeight as number
-          if (seenHeights.has(height)) return
-          seenHeights.add(height)
+        const seenKeys = new Set<string>()
+
+        levels.forEach(({ height, bandwidth, index }) => {
+          const dedupeKey = `${height ?? 'na'}|${bandwidth ?? 'na'}`
+          if (seenKeys.has(dedupeKey)) return
+          seenKeys.add(dedupeKey)
+
           options.push({
-            label: `${height}p`,
+            label: formatQualityLabel(height, bandwidth, options.length + 1),
             value: `hls-${index}`,
             levelIndex: index,
             height,
+            bandwidth,
           })
         })
 
