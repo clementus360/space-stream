@@ -20,6 +20,7 @@ export default function StreamPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [streamEnded, setStreamEnded] = useState(false)
+  const consecutiveStreamFetchFailures = useRef(0)
 
   const handleStreamEnded = () => {
     setStreamEnded(true)
@@ -34,6 +35,7 @@ export default function StreamPage() {
         setLoading(true)
         setError(null)
         setStreamEnded(false)
+        consecutiveStreamFetchFailures.current = 0
         try {
           const streamData = await getStream(username)
           if (isMounted) {
@@ -44,16 +46,20 @@ export default function StreamPage() {
             const live = await streamApi.getLiveStreams(100)
             const match = live.streams.find((item) => item.username === username)
             if (!match) {
-              // Stream not found in current live streams - it either ended or doesn't exist
-              // We'll mark it as "stream ended" for a better user message
               if (isMounted) {
-                setStreamEnded(true)
-                setError(null)
+                consecutiveStreamFetchFailures.current += 1
+                if (consecutiveStreamFetchFailures.current >= 3) {
+                  setStreamEnded(true)
+                  setError(null)
+                } else {
+                  setError('Stream metadata is temporarily unavailable. Retrying...')
+                }
               }
-              throw err
+              return
             }
             if (isMounted) {
               setStream(match)
+              consecutiveStreamFetchFailures.current = 0
             }
           } else {
             throw err
@@ -61,10 +67,11 @@ export default function StreamPage() {
         }
       } catch (err: any) {
         if (isMounted) {
-          if (streamEnded) {
-            // Already handled above
-          } else {
+          consecutiveStreamFetchFailures.current += 1
+          if (consecutiveStreamFetchFailures.current >= 3) {
             setError(err.message || 'Failed to load stream')
+          } else {
+            setError('Stream metadata is temporarily unavailable. Retrying...')
           }
         }
       } finally {
@@ -116,10 +123,16 @@ export default function StreamPage() {
     const interval = window.setInterval(async () => {
       try {
         await streamApi.getStream(username)
+        consecutiveStreamFetchFailures.current = 0
       } catch (err: any) {
         if (cancelled) return
         if (err?.message?.includes('404') || err?.message?.includes('410')) {
-          handleStreamEnded()
+          consecutiveStreamFetchFailures.current += 1
+          if (consecutiveStreamFetchFailures.current >= 3) {
+            handleStreamEnded()
+          }
+        } else {
+          consecutiveStreamFetchFailures.current += 1
         }
       }
     }, 20000)

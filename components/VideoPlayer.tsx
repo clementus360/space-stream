@@ -222,13 +222,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     const handleWaiting = () => {
       if (video.readyState < 3) {
         scheduleBufferingOverlay('Buffering, waiting for stream chunks...')
-        scheduleHardReconnect('buffering timeout')
       }
     }
     const handleStalled = () => {
       if (video.readyState < 3) {
         scheduleBufferingOverlay('Playback stalled, retrying...')
-        scheduleHardReconnect('stalled playback')
       }
     }
     const handlePlaying = () => {
@@ -380,7 +378,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         ) {
           hls.startLoad()
           scheduleBufferingOverlay('Reconnecting to stream chunks...')
-          scheduleHardReconnect('fragment retry')
         }
       })
     } else {
